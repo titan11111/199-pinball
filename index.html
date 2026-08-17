@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>PINBALL</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="start">
+  <h1>PINBALL</h1>
+  <p>HOLD LAUNCH で発射<br>LEFT / RIGHT でフリッパー<br>当たり音は Web Audio</p>
+  <button type="button" id="startBtn" class="game-btn">TAP TO START</button>
+  <div class="blink">TAP TO START</div>
+</div>
+
+<div id="app">
+  <div class="table-wrap">
+    <aside class="hud">
+      <div class="hud-block">
+        <div class="hud-label">TOP <span class="arr">▼</span></div>
+        <div class="hud-box" id="topScore">000000</div>
+      </div>
+      <div class="hud-block">
+        <div class="hud-label">1UP <span class="arr">▼</span></div>
+        <div class="hud-box" id="score">000000</div>
+      </div>
+      <div class="hud-block">
+        <div class="hud-label">BALL</div>
+        <div class="hud-box small" id="balls">03</div>
+      </div>
+      <button type="button" id="muteBtn" class="mute" aria-label="mute">🔊</button>
+    </aside>
+    <div class="stage" id="stage">
+      <canvas id="game" width="250" height="560"></canvas>
+    </div>
+  </div>
+  <div class="controls">
+    <button type="button" id="leftBtn" class="game-btn">LEFT</button>
+    <button type="button" id="launchBtn" class="game-btn">HOLD<br>LAUNCH</button>
+    <button type="button" id="rightBtn" class="game-btn">RIGHT</button>
+  </div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
