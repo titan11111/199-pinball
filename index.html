@@ -1,51 +1,516 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>PINBALL</title>
-<link rel="stylesheet" href="style.css">
-    <meta property="og:title" content="PINBALL">
-    <meta property="og:description" content="スマホ・PCのブラウザで遊べる無料ゲームです。インストール不要！">
-    <meta property="og:url" content="https://titan11111.github.io/199-pinball/">
-    <meta property="og:type" content="website">
-    <meta name="twitter:card" content="summary">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>NEON PINBALL JS</title>
+<style>
+  :root{
+    --bg:#050714;
+    --panel:#0a1030;
+    --cyan:#38f6ff;
+    --pink:#ff3fbf;
+    --violet:#875cff;
+    --lime:#b7ff3c;
+    --text:#eff7ff;
+  }
+  *,*::before,*::after{
+    box-sizing:border-box;-webkit-tap-highlight-color:transparent;
+    -webkit-touch-callout:none;user-select:none;touch-action:none
+  }
+  html,body{height:100%;margin:0;position:fixed;width:100%;
+    background:radial-gradient(circle at 50% 10%, #1a1f55 0, #080b20 34%, #02040d 78%);
+    color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    overflow:hidden;overscroll-behavior:none}
+  body{display:grid;place-items:center}
+  .wrap{
+    width:min(100vw,560px); height:min(100dvh,900px);
+    padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right))
+      max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .hud{
+    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+    padding:8px 12px;border:1px solid #30407a;border-radius:14px;
+    background:linear-gradient(180deg,#11183ccc,#070a1ecc);
+    box-shadow:0 0 24px #38f6ff22,inset 0 0 18px #875cff18;
+    backdrop-filter:blur(8px)
+  }
+  .logo{font-weight:900;letter-spacing:.12em;font-size:14px;color:var(--cyan);
+    text-shadow:0 0 12px #38f6ff}
+  .score{text-align:center}
+  .score small{display:block;font-size:10px;color:#8ea4d8;letter-spacing:.18em}
+  .score strong{display:block;font-size:24px;line-height:1;color:#fff;
+    text-shadow:0 0 13px #ff3fbf}
+  .balls{text-align:right;font-size:12px;color:#c5d4ff}
+  .stage{position:relative;flex:1;min-height:0;border-radius:24px;overflow:hidden;
+    border:2px solid #29376e;background:#030616;
+    box-shadow:0 0 30px #38f6ff22,0 0 55px #ff3fbf12}
+  canvas{width:100%;height:100%;display:block;touch-action:none}
+  .hint{
+    position:absolute;left:50%;bottom:10px;transform:translateX(-50%);
+    white-space:nowrap;font-size:11px;color:#9aace0;background:#040719bb;
+    border:1px solid #263566;border-radius:999px;padding:6px 10px;
+    pointer-events:none
+  }
+  .controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;
+    padding-bottom:env(safe-area-inset-bottom,0px)}
+  button{
+    border:1px solid #34437e;background:linear-gradient(180deg,#121a42,#090d25);
+    color:#fff;border-radius:14px;padding:13px 8px;font-weight:800;
+    letter-spacing:.04em;box-shadow:inset 0 0 15px #ffffff08;
+    min-height:48px;cursor:pointer;
+    transition:transform .08s ease,opacity .08s ease,filter .08s ease
+  }
+  button:active{transform:scale(.92);opacity:.88;filter:brightness(1.35)}
+  #leftBtn{box-shadow:inset 0 0 18px #38f6ff15}
+  #rightBtn{box-shadow:inset 0 0 18px #ff3fbf15}
+  #launchBtn{color:var(--lime)}
+  @media(max-height:700px){.hud{padding:5px 10px}.score strong{font-size:19px}.controls button{padding:9px 6px}}
+</style>
 </head>
 <body>
-<div id="start">
-  <h1>PINBALL</h1>
-  <p>HOLD LAUNCH で発射<br>LEFT / RIGHT でフリッパー<br>当たり音は Web Audio</p>
-  <button type="button" id="startBtn" class="game-btn">TAP TO START</button>
-  <div class="blink">TAP TO START</div>
+<div class="wrap">
+  <div class="hud">
+    <div class="logo">NEON // PINBALL</div>
+    <div class="score"><small>SCORE</small><strong id="score">000000</strong></div>
+    <div class="balls">BALL × <span id="balls">3</span></div>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="game"></canvas>
+    <div class="hint">← / → フリッパー　SPACE 発射　R リセット</div>
+  </div>
+
+  <div class="controls">
+    <button id="leftBtn">◀ LEFT</button>
+    <button id="launchBtn">LAUNCH</button>
+    <button id="rightBtn">RIGHT ▶</button>
+  </div>
 </div>
 
-<div id="app">
-  <div class="table-wrap">
-    <aside class="hud">
-      <div class="hud-block">
-        <div class="hud-label">TOP <span class="arr">▼</span></div>
-        <div class="hud-box" id="topScore">000000</div>
-      </div>
-      <div class="hud-block">
-        <div class="hud-label">1UP <span class="arr">▼</span></div>
-        <div class="hud-box" id="score">000000</div>
-      </div>
-      <div class="hud-block">
-        <div class="hud-label">BALL</div>
-        <div class="hud-box small" id="balls">03</div>
-      </div>
-      <button type="button" id="muteBtn" class="mute" aria-label="mute">🔊</button>
-    </aside>
-    <div class="stage" id="stage">
-      <canvas id="game" width="250" height="560"></canvas>
-    </div>
-  </div>
-  <div class="controls">
-    <button type="button" id="leftBtn" class="game-btn">LEFT</button>
-    <button type="button" id="launchBtn" class="game-btn">HOLD<br>LAUNCH</button>
-    <button type="button" id="rightBtn" class="game-btn">RIGHT</button>
-  </div>
-</div>
-<script src="script.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('selectstart', (e) => e.preventDefault());
+
+  function tapFeedback(){ if (navigator.vibrate) navigator.vibrate(15); }
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const stage = document.getElementById('stage');
+  const scoreEl = document.getElementById('score');
+  const ballsEl = document.getElementById('balls');
+
+  const W = 520, H = 790;
+  let dpr = Math.max(1, Math.min(2, devicePixelRatio || 1));
+
+  function resize(){
+    const r = stage.getBoundingClientRect();
+    canvas.width = Math.round(r.width*dpr);
+    canvas.height = Math.round(r.height*dpr);
+    canvas.style.width = r.width+'px';
+    canvas.style.height = r.height+'px';
+    ctx.setTransform(canvas.width/W,0,0,canvas.height/H,0,0);
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  const gravity = 610;
+  const FIXED = 1/120;
+  let accumulator = 0, last = performance.now();
+
+  let score = 0;
+  let balls = 3;
+  let gameOver = false;
+  let launchCharge = 0;
+  let charging = false;
+
+  const ball = {
+    x: 458, y: 690, vx:0, vy:0, r:10,
+    active:false, trail:[]
+  };
+
+  const bumpers = [
+    {x:170,y:210,r:30,color:'#38f6ff',value:250,flash:0},
+    {x:340,y:210,r:30,color:'#ff3fbf',value:250,flash:0},
+    {x:255,y:325,r:36,color:'#875cff',value:400,flash:0},
+    {x:145,y:410,r:25,color:'#b7ff3c',value:200,flash:0},
+    {x:365,y:410,r:25,color:'#ffb13b',value:200,flash:0},
+  ];
+
+  const posts = [
+    {x:100,y:520,r:12},{x:410,y:520,r:12},
+    {x:175,y:565,r:10},{x:335,y:565,r:10}
+  ];
+
+  const walls = [
+    [35,70,35,690],
+    [35,70,220,25],
+    [220,25,430,60],
+    [430,60,485,110],
+    [485,110,485,740],
+    [35,690,105,715],
+    [485,740,415,715],
+    [105,715,185,745],
+    [415,715,335,745],
+    [430,125,430,655], // launcher lane divider
+  ];
+
+  const guides = [
+    [70,470,112,535],
+    [112,615,150,645],
+    [398,615,360,645],
+  ];
+
+  const flippers = {
+    left:  {px:165,py:665,len:77,angle: 0.27,base:0.27,up:-0.55,pressed:false,omega:0},
+    right: {px:355,py:665,len:77,angle:Math.PI-0.27,base:Math.PI-0.27,up:Math.PI+0.55,pressed:false,omega:0}
+  };
+
+  function setScore(v){
+    score = Math.max(0,Math.floor(v));
+    scoreEl.textContent = score.toString().padStart(6,'0');
+  }
+
+  function resetBall(){
+    // Start the ball resting on top of the launcher spring.
+    ball.x=458; ball.y=650; ball.vx=0; ball.vy=0;
+    ball.active=false; ball.trail.length=0; launchCharge=0; charging=false;
+  }
+
+  function resetGame(){
+    balls=3; ballsEl.textContent=balls; gameOver=false; setScore(0); resetBall();
+  }
+
+  function launch(){
+    if(gameOver){ resetGame(); return; }
+    if(ball.active) return;
+    const p = Math.max(0.35, launchCharge || 0.65);
+    ball.active=true;
+    ball.vx = -18 - Math.random()*18;
+    ball.vy = -(690 + p*440);
+    launchCharge=0; charging=false;
+  }
+
+  function addScore(n){
+    setScore(score+n);
+  }
+
+  function closestPoint(ax,ay,bx,by,px,py){
+    const abx=bx-ax, aby=by-ay;
+    const apx=px-ax, apy=py-ay;
+    const d=abx*abx+aby*aby || 1;
+    const t=Math.max(0,Math.min(1,(apx*abx+apy*aby)/d));
+    return {x:ax+abx*t,y:ay+aby*t,t};
+  }
+
+  function collideSegment(ax,ay,bx,by,rest=0.83,boost=0){
+    const q=closestPoint(ax,ay,bx,by,ball.x,ball.y);
+    let dx=ball.x-q.x, dy=ball.y-q.y;
+    let dist=Math.hypot(dx,dy);
+    if(dist < ball.r+3){
+      if(dist<0.001){dx=0;dy=-1;dist=1}
+      const nx=dx/dist, ny=dy/dist;
+      const pen=ball.r+3-dist;
+      ball.x += nx*pen; ball.y += ny*pen;
+      const vn=ball.vx*nx+ball.vy*ny;
+      if(vn<0){
+        ball.vx -= (1+rest)*vn*nx;
+        ball.vy -= (1+rest)*vn*ny;
+        if(boost){
+          ball.vx += nx*boost;
+          ball.vy += ny*boost;
+        }
+      }
+    }
+  }
+
+  function collideCircle(c, extraBoost=0){
+    let dx=ball.x-c.x, dy=ball.y-c.y;
+    let d=Math.hypot(dx,dy);
+    const min=ball.r+c.r;
+    if(d<min){
+      if(d<0.001){dx=0;dy=-1;d=1}
+      const nx=dx/d, ny=dy/d;
+      ball.x += nx*(min-d); ball.y += ny*(min-d);
+      const vn=ball.vx*nx+ball.vy*ny;
+      const kick = Math.max(0, extraBoost);
+      if(vn<0){
+        ball.vx -= 1.9*vn*nx;
+        ball.vy -= 1.9*vn*ny;
+      }
+      ball.vx += nx*kick;
+      ball.vy += ny*kick;
+      return true;
+    }
+    return false;
+  }
+
+  function updateFlipper(f, dt, side){
+    const target = f.pressed ? f.up : f.base;
+    let diff = target - f.angle;
+    while(diff > Math.PI) diff -= Math.PI*2;
+    while(diff < -Math.PI) diff += Math.PI*2;
+
+    const prev=f.angle;
+    const speed = f.pressed ? 18 : 12;
+    f.angle += diff * Math.min(1, speed*dt);
+    f.omega = (f.angle-prev)/dt;
+
+    const ex=f.px+Math.cos(f.angle)*f.len;
+    const ey=f.py+Math.sin(f.angle)*f.len;
+    const q=closestPoint(f.px,f.py,ex,ey,ball.x,ball.y);
+    let dx=ball.x-q.x, dy=ball.y-q.y;
+    let d=Math.hypot(dx,dy);
+    const thickness=10;
+
+    if(d < ball.r+thickness){
+      if(d<0.001){dx=0;dy=-1;d=1}
+      const nx=dx/d, ny=dy/d;
+      ball.x += nx*(ball.r+thickness-d);
+      ball.y += ny*(ball.r+thickness-d);
+
+      const rx=q.x-f.px, ry=q.y-f.py;
+      const surfVx = -f.omega*ry;
+      const surfVy =  f.omega*rx;
+      const rvx=ball.vx-surfVx, rvy=ball.vy-surfVy;
+      const vn=rvx*nx+rvy*ny;
+      if(vn<0){
+        const impulse=-(1.55)*vn;
+        ball.vx += impulse*nx + surfVx*0.28;
+        ball.vy += impulse*ny + surfVy*0.28;
+        if(f.pressed){
+          ball.vx += side*55;
+          ball.vy -= 80;
+        }
+      }
+    }
+  }
+
+  function physics(dt){
+    if(charging && !ball.active) launchCharge=Math.min(1,launchCharge+dt*0.75);
+    bumpers.forEach(b=>b.flash=Math.max(0,b.flash-dt*4));
+
+    if(!ball.active) return;
+
+    ball.vy += gravity*dt;
+    ball.vx *= 0.9994;
+    ball.vy *= 0.9994;
+
+    const maxSpeed=1450;
+    const sp=Math.hypot(ball.vx,ball.vy);
+    if(sp>maxSpeed){ball.vx*=maxSpeed/sp;ball.vy*=maxSpeed/sp}
+
+    ball.x += ball.vx*dt;
+    ball.y += ball.vy*dt;
+
+    for(const w of walls) collideSegment(...w,0.88);
+    for(const g of guides) collideSegment(...g,0.87,8);
+
+    for(const b of bumpers){
+      if(collideCircle(b,165)){
+        b.flash=1;
+        addScore(b.value);
+      }
+    }
+    for(const p of posts) collideCircle(p,25);
+
+    updateFlipper(flippers.left,dt,-1);
+    updateFlipper(flippers.right,dt,1);
+
+    if(ball.y > H+35){
+      balls--;
+      ballsEl.textContent=balls;
+      if(balls<=0){ gameOver=true; resetBall(); }
+      else resetBall();
+    }
+
+    ball.trail.unshift({x:ball.x,y:ball.y});
+    if(ball.trail.length>14) ball.trail.pop();
+  }
+
+  function glowLine(ax,ay,bx,by,color,width=5){
+    ctx.save();
+    ctx.strokeStyle=color;
+    ctx.lineWidth=width;
+    ctx.lineCap='round';
+    ctx.shadowBlur=16; ctx.shadowColor=color;
+    ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+
+    const bg=ctx.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,'#0b1032');
+    bg.addColorStop(.5,'#05091d');
+    bg.addColorStop(1,'#02030a');
+    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+    // grid
+    ctx.save();
+    ctx.strokeStyle='#1a2454';ctx.lineWidth=1;ctx.globalAlpha=.33;
+    for(let x=0;x<W;x+=26){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+    for(let y=0;y<H;y+=26){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+    ctx.restore();
+
+    // title
+    ctx.save();ctx.textAlign='center';
+    ctx.font='900 28px system-ui';ctx.fillStyle='#eaffff';
+    ctx.shadowBlur=20;ctx.shadowColor='#38f6ff';
+    ctx.fillText('NEON PINBALL',260,105);
+    ctx.font='600 11px system-ui';ctx.fillStyle='#7e91ca';
+    ctx.shadowBlur=0;ctx.fillText('PHYSICS ARCADE // JAVASCRIPT',260,126);
+    ctx.restore();
+
+    for(const w of walls) glowLine(...w,'#5570d8',5);
+    for(const g of guides) glowLine(...g,'#a057ff',5);
+    glowLine(430,125,430,655,'#38f6ff',3);
+
+    // launcher spring
+    ctx.save();
+    ctx.strokeStyle='#b7ff3c';ctx.lineWidth=3;ctx.shadowBlur=12;ctx.shadowColor='#b7ff3c';
+    ctx.beginPath();
+    const sy=730, amp=8, turns=9, total=70*(1-launchCharge*.45);
+    for(let i=0;i<=turns*2;i++){
+      const yy=sy-i*(total/(turns*2));
+      const xx=458+(i===0||i===turns*2?0:(i%2?amp:-amp));
+      if(i===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);
+    }
+    ctx.stroke();ctx.restore();
+
+    // bumpers
+    bumpers.forEach(b=>{
+      ctx.save();
+      ctx.beginPath();ctx.arc(b.x,b.y,b.r+(b.flash*5),0,Math.PI*2);
+      ctx.fillStyle=b.flash?'#ffffff':b.color;
+      ctx.shadowBlur=24+(b.flash*22);ctx.shadowColor=b.color;ctx.fill();
+      ctx.beginPath();ctx.arc(b.x,b.y,b.r-9,0,Math.PI*2);
+      ctx.fillStyle='#081027';ctx.fill();
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.font='900 10px system-ui';ctx.fillStyle=b.color;
+      ctx.fillText('+'+b.value,b.x,b.y);
+      ctx.restore();
+    });
+
+    posts.forEach(p=>{
+      ctx.save();ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle='#dce6ff';ctx.shadowBlur=14;ctx.shadowColor='#ffffff';ctx.fill();ctx.restore();
+    });
+
+    function drawFlipper(f,color){
+      const ex=f.px+Math.cos(f.angle)*f.len, ey=f.py+Math.sin(f.angle)*f.len;
+      glowLine(f.px,f.py,ex,ey,color,20);
+      ctx.save();ctx.fillStyle='#fff';ctx.shadowBlur=18;ctx.shadowColor=color;
+      ctx.beginPath();ctx.arc(f.px,f.py,12,0,Math.PI*2);ctx.fill();ctx.restore();
+    }
+    drawFlipper(flippers.left,'#38f6ff');
+    drawFlipper(flippers.right,'#ff3fbf');
+
+    // trail
+    ball.trail.forEach((p,i)=>{
+      ctx.save();ctx.globalAlpha=(1-i/ball.trail.length)*.22;
+      ctx.fillStyle='#6bf7ff';
+      ctx.beginPath();ctx.arc(p.x,p.y,Math.max(1,ball.r*(1-i/ball.trail.length)),0,Math.PI*2);ctx.fill();
+      ctx.restore();
+    });
+
+    // ball
+    ctx.save();
+    const rg=ctx.createRadialGradient(ball.x-3,ball.y-4,2,ball.x,ball.y,ball.r);
+    rg.addColorStop(0,'#fff');rg.addColorStop(.35,'#bffcff');rg.addColorStop(1,'#4098ff');
+    ctx.fillStyle=rg;ctx.shadowBlur=18;ctx.shadowColor='#38f6ff';
+    ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fill();ctx.restore();
+
+    // charge meter
+    if(!ball.active && !gameOver){
+      ctx.save();
+      ctx.fillStyle='#17214a';ctx.fillRect(443,580,30,6);
+      ctx.fillStyle='#b7ff3c';ctx.shadowBlur=8;ctx.shadowColor='#b7ff3c';
+      ctx.fillRect(443,580,30*launchCharge,6);
+      ctx.restore();
+    }
+
+    if(gameOver){
+      ctx.save();ctx.fillStyle='#030511cc';ctx.fillRect(55,285,410,150);
+      ctx.strokeStyle='#ff3fbf';ctx.lineWidth=2;ctx.strokeRect(55,285,410,150);
+      ctx.textAlign='center';ctx.fillStyle='#fff';ctx.shadowBlur=20;ctx.shadowColor='#ff3fbf';
+      ctx.font='900 34px system-ui';ctx.fillText('GAME OVER',260,345);
+      ctx.shadowBlur=0;ctx.font='600 14px system-ui';ctx.fillStyle='#aebce8';
+      ctx.fillText('SPACE / LAUNCH で再スタート',260,385);
+      ctx.restore();
+    }
+  }
+
+  function loop(now){
+    const frame=Math.min(.04,(now-last)/1000);
+    last=now;accumulator+=frame;
+    while(accumulator>=FIXED){physics(FIXED);accumulator-=FIXED}
+    draw();requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  function setKey(code,on){
+    if(code==='ArrowLeft') flippers.left.pressed=on;
+    if(code==='ArrowRight') flippers.right.pressed=on;
+  }
+
+  addEventListener('keydown',e=>{
+    if(['ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+    if(e.code==='ArrowLeft'||e.code==='ArrowRight') setKey(e.code,true);
+    if(e.code==='Space'){
+      if(!ball.active && !charging){charging=true}
+      if(gameOver) launch();
+    }
+    if(e.code==='KeyR') resetGame();
+  },{passive:false});
+
+  addEventListener('keyup',e=>{
+    if(e.code==='ArrowLeft'||e.code==='ArrowRight') setKey(e.code,false);
+    if(e.code==='Space' && charging) launch();
+  });
+
+  function holdButton(el,onDown,onUp){
+    const down=e=>{e.preventDefault();tapFeedback();onDown();};
+    const up=e=>{e.preventDefault();onUp();};
+    el.addEventListener('pointerdown',down);
+    el.addEventListener('pointerup',up);
+    el.addEventListener('pointercancel',up);
+    el.addEventListener('pointerleave',e=>{ if(e.buttons) up(e); });
+  }
+  holdButton(document.getElementById('leftBtn'),
+    ()=>flippers.left.pressed=true,()=>flippers.left.pressed=false);
+  holdButton(document.getElementById('rightBtn'),
+    ()=>flippers.right.pressed=true,()=>flippers.right.pressed=false);
+  holdButton(document.getElementById('launchBtn'),
+    ()=>{ if(!ball.active) charging=true; },
+    ()=>{ if(charging) launch(); else if(gameOver) launch(); });
+
+  // canvas tap: left/right half = flippers
+  canvas.addEventListener('pointerdown',e=>{
+    const r=canvas.getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width;
+    if(x<.42) flippers.left.pressed=true;
+    else if(x>.58) flippers.right.pressed=true;
+  });
+  canvas.addEventListener('pointerup',()=>{
+    flippers.left.pressed=false;flippers.right.pressed=false;
+  });
+
+  resetGame();
+})();
+</script>
 </body>
 </html>
