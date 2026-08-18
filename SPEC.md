@@ -19,17 +19,20 @@
 - 論理座標系 520×790。DPR対応リサイズ
 - 物理: 重力 + 壁/ガイド/バンパー/フリッパー反射。固定タイムステップ 1/120s
 - 発射レーン右端。チャージメーター付きプランジャー
-- iOS Safari: viewport-fit=cover / safe-area / ダブルタップ防止 / pointerdown ボタン
+- タイトル画面 → TAP TO START でプレイ開始
+- BGM: タイトル `audio/title-bgm.m4a`（ぴこぴこ対戦）/ プレイ `audio/play-bgm.m4a`（Neon Paddle）
+- iOS Safari: viewport-fit=cover / safe-area / ダブルタップ防止 / Audio unlock / ミュート保存
 
 ## ファイル構成
 ```
 199-pinball/
-  index.html   # HTML + CSS + JS 単一ファイル
+  index.html
+  audio/title-bgm.m4a
+  audio/play-bgm.m4a
   SPEC.md
   LEARNINGS.md
   .nojekyll
 ```
 
 ## 未確定事項
-- BGM・効果音（WebAudio）は次回改修候補
 - ハイスコア localStorage 保存は未実装

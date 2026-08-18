@@ -66,6 +66,62 @@
   #leftBtn{box-shadow:inset 0 0 18px #38f6ff15}
   #rightBtn{box-shadow:inset 0 0 18px #ff3fbf15}
   #launchBtn{color:var(--lime)}
+  .title-layer{
+    position:fixed;inset:0;z-index:1000;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right)
+      env(safe-area-inset-bottom) env(safe-area-inset-left)
+  }
+  .title-layer.hidden{display:none}
+  .wrap.hidden{visibility:hidden;pointer-events:none}
+  .title-screen{
+    position:absolute;inset:0;display:grid;place-items:start center;
+    background:
+      linear-gradient(180deg,rgba(2,4,13,.78) 0%,rgba(2,4,13,.28) 32%,rgba(2,4,13,.42) 58%,rgba(2,4,13,.82) 100%),
+      url('images/title-bg.webp') center top/cover no-repeat,#050714;
+    padding:max(10vh,env(safe-area-inset-top)) 0 0;
+    pointer-events:none
+  }
+  .title-inner{text-align:center;max-width:min(92vw,420px);padding:8px 16px 0;pointer-events:none}
+  .title-tag{
+    font-size:11px;letter-spacing:.28em;color:#dff7ff;margin:0 0 12px;
+    text-shadow:0 1px 8px rgba(0,0,0,.85)
+  }
+  .title-inner h1{
+    margin:0;font-size:clamp(42px,11vw,56px);font-weight:900;line-height:.95;
+    letter-spacing:.06em;color:#eaffff;
+    text-shadow:0 0 18px #38f6ff,0 0 42px #875cff88,0 2px 12px rgba(0,0,0,.9);
+    animation:titlePulse 2.4s ease-in-out infinite
+  }
+  .title-sub{
+    margin:14px 0 0;font-size:13px;color:#f0f6ff;letter-spacing:.12em;
+    text-shadow:0 1px 10px rgba(0,0,0,.9)
+  }
+  .start-btn{
+    position:absolute;left:50%;bottom:max(8%,calc(6% + env(safe-area-inset-bottom)));
+    transform:translateX(-50%);z-index:2;pointer-events:auto;
+    display:inline-block;min-width:220px;min-height:56px;padding:16px 28px;
+    border:2px solid #38f6ff;border-radius:999px;
+    background:linear-gradient(180deg,rgba(18,26,66,.92),rgba(9,13,37,.95));
+    color:var(--lime);font-size:15px;font-weight:900;letter-spacing:.18em;
+    box-shadow:0 0 28px #38f6ff55,0 4px 24px rgba(0,0,0,.55),inset 0 0 20px #ffffff08;
+    animation:startBlink 1.6s ease-in-out infinite
+  }
+  .title-hint{
+    position:absolute;left:50%;bottom:max(3%,calc(1% + env(safe-area-inset-bottom)));
+    transform:translateX(-50%);z-index:2;width:min(92vw,360px);margin:0;
+    font-size:11px;color:#e8eeff;letter-spacing:.08em;pointer-events:none;text-align:center;
+    text-shadow:0 1px 8px rgba(0,0,0,.9)
+  }
+  .title-hint.hidden{display:none}
+  .mute-btn{
+    position:fixed;top:max(10px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));
+    z-index:1100;width:44px;height:44px;border-radius:50%;
+    border:1px solid #34437e;background:#0a1030cc;color:#fff;font-size:18px;
+    display:grid;place-items:center;cursor:pointer;
+    box-shadow:0 0 16px #38f6ff22
+  }
+  @keyframes titlePulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.15)}}
+  @keyframes startBlink{0%,100%{opacity:1}50%{opacity:.75}}
   @media(max-height:700px){.hud{padding:5px 10px}.score strong{font-size:19px}.controls button{padding:9px 6px}}
 </style>
     <meta property="og:title" content="NEON PINBALL JS">
@@ -75,7 +131,20 @@
     <meta name="twitter:card" content="summary">
 </head>
 <body>
-<div class="wrap">
+<div id="titleLayer" class="title-layer">
+  <button type="button" id="startBtn" class="start-btn">TAP TO START</button>
+  <div id="titleScreen" class="title-screen">
+    <div class="title-inner">
+      <p class="title-tag">ARCADE // PHYSICS</p>
+      <h1>NEON<br>PINBALL</h1>
+      <p class="title-sub">サイバーパンク・ピンボール</p>
+    </div>
+  </div>
+  <p id="titleHint" class="title-hint">タップでタイトルBGM開始</p>
+</div>
+<button type="button" id="muteBtn" class="mute-btn" aria-label="音声切替">🔊</button>
+
+<div class="wrap hidden" id="gameWrap">
   <div class="hud">
     <div class="logo">NEON // PINBALL</div>
     <div class="score"><small>SCORE</small><strong id="score">000000</strong></div>
@@ -110,6 +179,210 @@
   document.addEventListener('selectstart', (e) => e.preventDefault());
 
   function tapFeedback(){ if (navigator.vibrate) navigator.vibrate(15); }
+
+  let screen = 'title';
+  let titleBgmStarted = false;
+
+  const titleLayer = document.getElementById('titleLayer');
+  const startBtn = document.getElementById('startBtn');
+  const muteBtn = document.getElementById('muteBtn');
+  const titleHint = document.getElementById('titleHint');
+  const gameWrap = document.getElementById('gameWrap');
+
+  const BGM = {
+    title: Object.assign(new Audio('audio/title-bgm.m4a'), { loop: true, preload: 'auto' }),
+    play: Object.assign(new Audio('audio/play-bgm.m4a'), { loop: true, preload: 'auto' }),
+    unlocked: false,
+    muted: localStorage.getItem('pinball-mute') === '1'
+  };
+
+  function applyVolume(){
+    const v = BGM.muted ? 0 : 0.72;
+    BGM.title.volume = v;
+    BGM.play.volume = v;
+    muteBtn.textContent = BGM.muted ? '🔇' : '🔊';
+  }
+  applyVolume();
+
+  let audioCtx = null;
+  function getAudioCtx(){
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+
+  function beep(freq, dur, type, gainVal, delay=0){
+    if (BGM.muted) return;
+    try{
+      const c = getAudioCtx();
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = type || 'square';
+      osc.frequency.setValueAtTime(freq, c.currentTime + delay);
+      osc.connect(gain);
+      gain.connect(c.destination);
+      const g = gainVal != null ? gainVal : 0.12;
+      const t = c.currentTime + delay;
+      gain.gain.setValueAtTime(g, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.start(t);
+      osc.stop(t + dur + 0.02);
+    }catch(_){}
+  }
+
+  let lastBounceSfx = 0;
+  let lastFlipPressSfx = 0;
+  function canPlaySfx(minGap=0.028){
+    if (BGM.muted) return false;
+    const c = getAudioCtx();
+    const now = c.currentTime;
+    if (now - lastBounceSfx < minGap) return false;
+    lastBounceSfx = now;
+    return true;
+  }
+
+  const sfx = {
+    launch(){
+      beep(140, 0.24, 'sawtooth', 0.20);
+      beep(280, 0.10, 'square', 0.16, 0.04);
+      beep(520, 0.08, 'square', 0.14, 0.10);
+    },
+    flipPress(){
+      const c = getAudioCtx();
+      const now = c.currentTime;
+      if (now - lastFlipPressSfx < 0.06) return;
+      lastFlipPressSfx = now;
+      beep(260, 0.05, 'square', 0.16);
+      beep(390, 0.04, 'triangle', 0.10, 0.02);
+    },
+    flipHit(impact){
+      if (!canPlaySfx(0.02)) return;
+      const f = 420 + Math.min(280, impact * 0.12);
+      beep(f, 0.07, 'square', 0.18);
+      beep(f * 1.35, 0.05, 'triangle', 0.12, 0.03);
+    },
+    bumper(value){
+      if (!canPlaySfx(0.04)) return;
+      const f = 520 + Math.min(380, value * 0.5);
+      beep(f, 0.11, 'square', 0.20);
+      beep(f * 1.25, 0.07, 'triangle', 0.14, 0.05);
+    },
+    post(impact){
+      if (!canPlaySfx(0.03)) return;
+      beep(740 + Math.min(200, impact * 0.08), 0.08, 'triangle', 0.16);
+    },
+    wall(impact){
+      if (!canPlaySfx(0.025)) return;
+      beep(160 + Math.min(240, impact * 0.14), 0.06, 'square', 0.14);
+    },
+    drain(){
+      beep(180, 0.12, 'triangle', 0.14);
+      beep(110, 0.22, 'sawtooth', 0.16, 0.08);
+    }
+  };
+
+  function playGameOverSFX(){
+    if (BGM.muted) return;
+    beep(330, 0.16, 'square', 0.11, 0);
+    beep(262, 0.20, 'square', 0.12, 0.12);
+    beep(196, 0.26, 'sawtooth', 0.13, 0.28);
+    beep(98, 0.70, 'triangle', 0.15, 0.48);
+  }
+
+  function stopPlayBGM(){
+    BGM.play.pause();
+    BGM.play.currentTime = 0;
+  }
+
+  async function unlockAudio(){
+    if (BGM.unlocked) return;
+    BGM.unlocked = true;
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+    try{
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+    }catch(_){}
+    for (const a of [BGM.title, BGM.play]){
+      try{
+        await a.play();
+        a.pause();
+        a.currentTime = 0;
+      }catch(_){}
+    }
+  }
+
+  async function startTitleBGM(){
+    await unlockAudio();
+    if (BGM.muted) return;
+    BGM.play.pause();
+    BGM.play.currentTime = 0;
+    BGM.title.currentTime = 0;
+    try{ await BGM.title.play(); }catch(_){}
+  }
+
+  async function startPlayBGM(){
+    await unlockAudio();
+    BGM.title.pause();
+    if (BGM.muted) return;
+    BGM.play.currentTime = 0;
+    try{ await BGM.play.play(); }catch(_){}
+  }
+
+  function resumeBGM(){
+    if (BGM.muted || !BGM.unlocked) return;
+    if (screen === 'play' && gameOver) return;
+    const track = screen === 'title' ? BGM.title : BGM.play;
+    if (track.paused) track.play().catch(()=>{});
+  }
+
+  function beginGame(){
+    screen = 'play';
+    titleLayer.classList.add('hidden');
+    gameWrap.classList.remove('hidden');
+    gameWrap.setAttribute('aria-hidden', 'false');
+    BGM.title.pause();
+    startPlayBGM();
+    resetGame();
+    tapFeedback();
+  }
+
+  async function handleTitleStart(){
+    tapFeedback();
+    if (!titleBgmStarted){
+      titleBgmStarted = true;
+      await startTitleBGM();
+      startBtn.textContent = 'START GAME';
+      titleHint.textContent = 'START GAME でプレイ開始';
+      return;
+    }
+    beginGame();
+  }
+
+  startBtn.addEventListener('pointerdown', (e)=>{
+    e.preventDefault();
+    handleTitleStart();
+  });
+
+  muteBtn.addEventListener('pointerdown', (e)=>{
+    e.preventDefault();
+    tapFeedback();
+    BGM.muted = !BGM.muted;
+    localStorage.setItem('pinball-mute', BGM.muted ? '1' : '0');
+    applyVolume();
+    if (!BGM.muted && BGM.unlocked){
+      resumeBGM();
+    } else {
+      BGM.title.pause();
+      BGM.play.pause();
+    }
+  });
+
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.visibilityState === 'visible') resumeBGM();
+  });
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -195,7 +468,16 @@
   }
 
   function resetGame(){
+    const wasOver = gameOver;
     balls=3; ballsEl.textContent=balls; gameOver=false; setScore(0); resetBall();
+    if (wasOver && screen === 'play' && !BGM.muted) startPlayBGM();
+  }
+
+  function triggerGameOver(){
+    gameOver = true;
+    resetBall();
+    stopPlayBGM();
+    playGameOverSFX();
   }
 
   function launch(){
@@ -206,6 +488,8 @@
     ball.vx = -18 - Math.random()*18;
     ball.vy = -(690 + p*440);
     launchCharge=0; charging=false;
+    unlockAudio();
+    sfx.launch();
   }
 
   function addScore(n){
@@ -237,8 +521,10 @@
           ball.vx += nx*boost;
           ball.vy += ny*boost;
         }
+        return Math.abs(vn);
       }
     }
+    return 0;
   }
 
   function collideCircle(c, extraBoost=0){
@@ -251,15 +537,17 @@
       ball.x += nx*(min-d); ball.y += ny*(min-d);
       const vn=ball.vx*nx+ball.vy*ny;
       const kick = Math.max(0, extraBoost);
+      let impact = 0;
       if(vn<0){
         ball.vx -= 1.9*vn*nx;
         ball.vy -= 1.9*vn*ny;
+        impact = Math.abs(vn);
       }
       ball.vx += nx*kick;
       ball.vy += ny*kick;
-      return true;
+      return impact + kick * 0.35;
     }
-    return false;
+    return 0;
   }
 
   function updateFlipper(f, dt, side){
@@ -299,11 +587,13 @@
           ball.vx += side*55;
           ball.vy -= 80;
         }
+        sfx.flipHit(Math.abs(vn) + (f.pressed ? 120 : 0));
       }
     }
   }
 
   function physics(dt){
+    if(screen !== 'play') return;
     if(charging && !ball.active) launchCharge=Math.min(1,launchCharge+dt*0.75);
     bumpers.forEach(b=>b.flash=Math.max(0,b.flash-dt*4));
 
@@ -320,16 +610,23 @@
     ball.x += ball.vx*dt;
     ball.y += ball.vy*dt;
 
-    for(const w of walls) collideSegment(...w,0.88);
-    for(const g of guides) collideSegment(...g,0.87,8);
+    let wallImpact = 0;
+    for(const w of walls) wallImpact = Math.max(wallImpact, collideSegment(...w,0.88));
+    for(const g of guides) wallImpact = Math.max(wallImpact, collideSegment(...g,0.87,8));
+    if (wallImpact > 70) sfx.wall(wallImpact);
 
     for(const b of bumpers){
-      if(collideCircle(b,165)){
+      const hit = collideCircle(b,165);
+      if(hit > 0){
         b.flash=1;
         addScore(b.value);
+        sfx.bumper(b.value);
       }
     }
-    for(const p of posts) collideCircle(p,25);
+    for(const p of posts){
+      const hit = collideCircle(p,25);
+      if(hit > 40) sfx.post(hit);
+    }
 
     updateFlipper(flippers.left,dt,-1);
     updateFlipper(flippers.right,dt,1);
@@ -337,7 +634,8 @@
     if(ball.y > H+35){
       balls--;
       ballsEl.textContent=balls;
-      if(balls<=0){ gameOver=true; resetBall(); }
+      sfx.drain();
+      if(balls<=0) triggerGameOver();
       else resetBall();
     }
 
@@ -467,12 +765,25 @@
   }
   requestAnimationFrame(loop);
 
+  function setFlipper(side, on){
+    const f = side === 'left' ? flippers.left : flippers.right;
+    if (on && !f.pressed) sfx.flipPress();
+    f.pressed = on;
+  }
+
   function setKey(code,on){
-    if(code==='ArrowLeft') flippers.left.pressed=on;
-    if(code==='ArrowRight') flippers.right.pressed=on;
+    if(code==='ArrowLeft') setFlipper('left', on);
+    if(code==='ArrowRight') setFlipper('right', on);
   }
 
   addEventListener('keydown',e=>{
+    if(screen === 'title'){
+      if(e.code==='Space' || e.code==='Enter'){
+        e.preventDefault();
+        handleTitleStart();
+      }
+      return;
+    }
     if(['ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
     if(e.code==='ArrowLeft'||e.code==='ArrowRight') setKey(e.code,true);
     if(e.code==='Space'){
@@ -483,6 +794,7 @@
   },{passive:false});
 
   addEventListener('keyup',e=>{
+    if(screen !== 'play') return;
     if(e.code==='ArrowLeft'||e.code==='ArrowRight') setKey(e.code,false);
     if(e.code==='Space' && charging) launch();
   });
@@ -496,25 +808,27 @@
     el.addEventListener('pointerleave',e=>{ if(e.buttons) up(e); });
   }
   holdButton(document.getElementById('leftBtn'),
-    ()=>flippers.left.pressed=true,()=>flippers.left.pressed=false);
+    ()=>{ if(screen!=='play')return; setFlipper('left', true); },
+    ()=>flippers.left.pressed=false);
   holdButton(document.getElementById('rightBtn'),
-    ()=>flippers.right.pressed=true,()=>flippers.right.pressed=false);
+    ()=>{ if(screen!=='play')return; setFlipper('right', true); },
+    ()=>flippers.right.pressed=false);
   holdButton(document.getElementById('launchBtn'),
-    ()=>{ if(!ball.active) charging=true; },
-    ()=>{ if(charging) launch(); else if(gameOver) launch(); });
+    ()=>{ if(screen!=='play')return; if(!ball.active) charging=true; },
+    ()=>{ if(screen!=='play')return; if(charging) launch(); else if(gameOver) launch(); });
 
-  // canvas tap: left/right half = flippers
   canvas.addEventListener('pointerdown',e=>{
+    if(screen!=='play') return;
     const r=canvas.getBoundingClientRect();
     const x=(e.clientX-r.left)/r.width;
-    if(x<.42) flippers.left.pressed=true;
-    else if(x>.58) flippers.right.pressed=true;
+    if(x<.42) setFlipper('left', true);
+    else if(x>.58) setFlipper('right', true);
   });
   canvas.addEventListener('pointerup',()=>{
     flippers.left.pressed=false;flippers.right.pressed=false;
   });
 
-  resetGame();
+  resetBall();
 })();
 </script>
 </body>
