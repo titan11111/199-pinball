@@ -16,12 +16,16 @@
   }
   *,*::before,*::after{
     box-sizing:border-box;-webkit-tap-highlight-color:transparent;
-    -webkit-touch-callout:none;user-select:none;touch-action:none
+    -webkit-touch-callout:none;-webkit-user-select:none;-moz-user-select:none;
+    user-select:none;-webkit-user-drag:none;touch-action:none
   }
+  ::selection{background:transparent;color:inherit}
+  ::-moz-selection{background:transparent;color:inherit}
   html,body{height:100%;margin:0;position:fixed;width:100%;
     background:radial-gradient(circle at 50% 10%, #1a1f55 0, #080b20 34%, #02040d 78%);
     color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
-    overflow:hidden;overscroll-behavior:none}
+    overflow:hidden;overscroll-behavior:none;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   body{display:grid;place-items:center}
   .wrap{
     width:min(100vw,560px); height:min(100dvh,900px);
@@ -46,7 +50,8 @@
   .stage{position:relative;flex:1;min-height:0;border-radius:24px;overflow:hidden;
     border:2px solid #29376e;background:#030616;
     box-shadow:0 0 30px #38f6ff22,0 0 55px #ff3fbf12}
-  canvas{width:100%;height:100%;display:block;touch-action:none}
+  canvas{width:100%;height:100%;display:block;touch-action:none;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none}
   .hint{
     position:absolute;left:50%;bottom:10px;transform:translateX(-50%);
     white-space:nowrap;font-size:11px;color:#9aace0;background:#040719bb;
@@ -168,6 +173,7 @@
   'use strict';
 
   let lastTouchEnd = 0;
+  document.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
   document.addEventListener('touchend', (e) => {
     const now = Date.now();
     if (now - lastTouchEnd <= 300) e.preventDefault();
@@ -177,6 +183,8 @@
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
   document.addEventListener('selectstart', (e) => e.preventDefault());
+  document.addEventListener('dragstart', (e) => e.preventDefault());
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
 
   function tapFeedback(){ if (navigator.vibrate) navigator.vibrate(15); }
 
@@ -405,8 +413,10 @@
   resize();
 
   const gravity = 610;
+  const BOUNCE_SCALE = 0.8; // 反射速度 20% ダウン
   const FIXED = 1/120;
   let accumulator = 0, last = performance.now();
+  const LANE = { left: 430, right: 485, floorY: 660, restX: 458, restY: 650 };
 
   let score = 0;
   let balls = 3;
@@ -415,7 +425,7 @@
   let charging = false;
 
   const ball = {
-    x: 458, y: 690, vx:0, vy:0, r:10,
+    x: LANE.restX, y: LANE.restY, vx:0, vy:0, r:10,
     active:false, trail:[]
   };
 
@@ -442,7 +452,8 @@
     [485,740,415,715],
     [105,715,185,745],
     [415,715,335,745],
-    [430,125,430,655], // launcher lane divider
+    [LANE.left,125,LANE.left,LANE.floorY], // launcher lane divider down to the shelf
+    [LANE.left,LANE.floorY,LANE.right,LANE.floorY], // plunger shelf — ball rests here
   ];
 
   const guides = [
@@ -463,7 +474,7 @@
 
   function resetBall(){
     // Start the ball resting on top of the launcher spring.
-    ball.x=458; ball.y=650; ball.vx=0; ball.vy=0;
+    ball.x=LANE.restX; ball.y=LANE.restY; ball.vx=0; ball.vy=0;
     ball.active=false; ball.trail.length=0; launchCharge=0; charging=false;
   }
 
@@ -505,6 +516,8 @@
   }
 
   function collideSegment(ax,ay,bx,by,rest=0.83,boost=0){
+    rest *= BOUNCE_SCALE;
+    boost *= BOUNCE_SCALE;
     const q=closestPoint(ax,ay,bx,by,ball.x,ball.y);
     let dx=ball.x-q.x, dy=ball.y-q.y;
     let dist=Math.hypot(dx,dy);
@@ -536,11 +549,12 @@
       const nx=dx/d, ny=dy/d;
       ball.x += nx*(min-d); ball.y += ny*(min-d);
       const vn=ball.vx*nx+ball.vy*ny;
-      const kick = Math.max(0, extraBoost);
+      const kick = Math.max(0, extraBoost * BOUNCE_SCALE);
       let impact = 0;
       if(vn<0){
-        ball.vx -= 1.9*vn*nx;
-        ball.vy -= 1.9*vn*ny;
+        const bounce = 1 + 0.9 * BOUNCE_SCALE;
+        ball.vx -= bounce*vn*nx;
+        ball.vy -= bounce*vn*ny;
         impact = Math.abs(vn);
       }
       ball.vx += nx*kick;
@@ -580,16 +594,31 @@
       const rvx=ball.vx-surfVx, rvy=ball.vy-surfVy;
       const vn=rvx*nx+rvy*ny;
       if(vn<0){
-        const impulse=-(1.55)*vn;
-        ball.vx += impulse*nx + surfVx*0.28;
-        ball.vy += impulse*ny + surfVy*0.28;
+        const impulse=-(1 + 0.55 * BOUNCE_SCALE)*vn;
+        ball.vx += impulse*nx + surfVx*0.28*BOUNCE_SCALE;
+        ball.vy += impulse*ny + surfVy*0.28*BOUNCE_SCALE;
         if(f.pressed){
-          ball.vx += side*55;
-          ball.vy -= 80;
+          ball.vx += side*55*BOUNCE_SCALE;
+          ball.vy -= 80*BOUNCE_SCALE;
         }
         sfx.flipHit(Math.abs(vn) + (f.pressed ? 120 : 0));
       }
     }
+  }
+
+  function recapturePlunger(){
+    if(!ball.active) return false;
+    const inLane = ball.x > LANE.left && ball.x < LANE.right + ball.r;
+    if(!inLane) return false;
+    // Failed shot falling back onto the spring, or already slipped under it.
+    // Launch vy is strongly negative, so a fresh shot is never recaptured.
+    const fallingOntoSpring = ball.y > LANE.restY - 10 && ball.vy >= 0;
+    const underSpring = ball.y > LANE.floorY - 4;
+    if(fallingOntoSpring || underSpring){
+      resetBall();
+      return true;
+    }
+    return false;
   }
 
   function physics(dt){
@@ -598,6 +627,7 @@
     bumpers.forEach(b=>b.flash=Math.max(0,b.flash-dt*4));
 
     if(!ball.active) return;
+    if(recapturePlunger()) return;
 
     ball.vy += gravity*dt;
     ball.vx *= 0.9994;
@@ -630,6 +660,8 @@
 
     updateFlipper(flippers.left,dt,-1);
     updateFlipper(flippers.right,dt,1);
+
+    if(recapturePlunger()) return;
 
     if(ball.y > H+35){
       balls--;
@@ -680,7 +712,8 @@
 
     for(const w of walls) glowLine(...w,'#5570d8',5);
     for(const g of guides) glowLine(...g,'#a057ff',5);
-    glowLine(430,125,430,655,'#38f6ff',3);
+    glowLine(LANE.left,125,LANE.left,LANE.floorY,'#38f6ff',3);
+    glowLine(LANE.left,LANE.floorY,LANE.right,LANE.floorY,'#b7ff3c',6);
 
     // launcher spring
     ctx.save();
@@ -818,13 +851,15 @@
     ()=>{ if(screen!=='play')return; if(charging) launch(); else if(gameOver) launch(); });
 
   canvas.addEventListener('pointerdown',e=>{
+    e.preventDefault();
     if(screen!=='play') return;
     const r=canvas.getBoundingClientRect();
     const x=(e.clientX-r.left)/r.width;
     if(x<.42) setFlipper('left', true);
     else if(x>.58) setFlipper('right', true);
   });
-  canvas.addEventListener('pointerup',()=>{
+  canvas.addEventListener('pointerup',e=>{
+    e.preventDefault();
     flippers.left.pressed=false;flippers.right.pressed=false;
   });
 

@@ -18,10 +18,11 @@
 ## 実装メモ
 - 論理座標系 520×790。DPR対応リサイズ
 - 物理: 重力 + 壁/ガイド/バンパー/フリッパー反射。固定タイムステップ 1/120s
-- 発射レーン右端。チャージメーター付きプランジャー
+- 発射レーン右端。チャージメーター付きプランジャー。レーン底に床があり、失敗ショットで戻ったボールはドレインせず台の上へ再捕獲する
+- 反射係数は `BOUNCE_SCALE = 0.8`（壁・バンパー・ポスト・フリッパー。発射初速と重力は対象外）
 - タイトル画面 → TAP TO START でプレイ開始
 - BGM: タイトル `audio/title-bgm.m4a`（ぴこぴこ対戦）/ プレイ `audio/play-bgm.m4a`（Neon Paddle）
-- iOS Safari: viewport-fit=cover / safe-area / ダブルタップ防止 / Audio unlock / ミュート保存
+- iOS Safari: viewport-fit=cover / safe-area / ダブルタップ防止 / Audio unlock / ミュート保存 / テキスト選択・ハイライト防止（`-webkit-user-select:none` / `touchstart` preventDefault）
 
 ## ファイル構成
 ```
